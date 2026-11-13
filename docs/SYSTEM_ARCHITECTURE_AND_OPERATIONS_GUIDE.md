@@ -1,5 +1,4 @@
 # Dual Firmware (ESP32) — Circular Buffer System Architecture & Operations Guide
-**Practical Assignment 1b · Inspecity Space Laboratories**
 
 ---
 
