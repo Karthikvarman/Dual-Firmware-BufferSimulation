@@ -1,0 +1,10 @@
+^C:\USERS\ATKVA\ONEDRIVE\DESKTOP\INSPECITY - 1B\ESP32_SERVER\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/atkva/OneDrive/Desktop/Inspecity - 1b" "-BC:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build" --check-stamp-file "C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_server/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

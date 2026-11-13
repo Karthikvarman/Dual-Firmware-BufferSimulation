@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\atkva\OneDrive\Desktop\Inspecity - 1b\esp32_server\main\main_server.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\atkva\OneDrive\Desktop\Inspecity - 1b\common\circular_buffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\atkva\OneDrive\Desktop\Inspecity - 1b\esp32_server\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{5CC85FF4-695D-372E-B150-85C23CDC7CF4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

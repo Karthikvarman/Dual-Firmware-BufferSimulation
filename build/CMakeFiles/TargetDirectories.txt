@@ -1,0 +1,7 @@
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/CMakeFiles/test_circular_buffer.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_client/CMakeFiles/client_component.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_client/CMakeFiles/ALL_BUILD.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_server/CMakeFiles/server_component.dir
+C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_server/CMakeFiles/ALL_BUILD.dir

@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/cmake_install.cmake",
+		"C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_client/cmake_install.cmake",
+		"C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_server/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

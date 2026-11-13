@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Firmware (ESP32) - Circular Buffer Simulation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-main: #0a0e1a;
+            --bg-card: #111827;
+            --bg-card-inner: #151d2e;
+            --bg-elevated: #1a2236;
+            --bg-terminal: #0d1117;
+            --bg-input: #161f30;
+            --border: rgba(255, 255, 255, 0.06);
+            --border-light: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(99, 102, 241, 0.25);
+
+            --text-bright: #f0f4ff;
+            --text-primary: #c8d1e0;
+            --text-secondary: #7c8ba5;
+            --text-muted: #4a5568;
+            --text-dim: #384152;
+
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --accent-dim: rgba(99, 102, 241, 0.15);
+            --accent-glow: rgba(99, 102, 241, 0.08);
+
+            --success: #10b981;
+            --success-dim: rgba(16, 185, 129, 0.12);
+            --success-glow: rgba(16, 185, 129, 0.06);
+
+            --warning: #f59e0b;
+            --warning-dim: rgba(245, 158, 11, 0.12);
+
+            --danger: #ef4444;
+            --danger-dim: rgba(239, 68, 68, 0.1);
+            --danger-glow: rgba(239, 68, 68, 0.05);
+
+            --cyan: #06b6d4;
+            --cyan-dim: rgba(6, 182, 212, 0.12);
+
+            --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
+            --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+            --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.06);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ═══ HEADER ═══ */
+        header {
+            background: linear-gradient(180deg, #111827 0%, #0f1524 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            font-size: 14px;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-title h1 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-bright);
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+
+        .header-title h1 span {
+            color: var(--accent-light);
+        }
+
+        .header-title .subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 0.2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px 5px 10px;
+            background: var(--success-dim);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--success);
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 1.5px solid var(--success);
+            animation: pulse-ring 2s ease-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            100% {
+                transform: scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        /* ═══ LAYOUT ═══ */
+        .page-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 20px 24px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ═══ ALERT BANNER ═══ */
+        .alert-banner {
+            display: none;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.03) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius);
+            padding: 14px 20px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .alert-banner.visible {
+            display: flex;
+        }
+
+        .alert-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-icon-box {
+            width: 36px;
+            height: 36px;
+            background: rgba(239, 68, 68, 0.15);
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .alert-text h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fca5a5;
+        }
+
+        .alert-text p {
+            font-size: 12px;
+            color: #f87171;
+            margin-top: 2px;
+            opacity: 0.85;
+        }
+
+        /* ═══ TWO-COLUMN GRID ═══ */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 16px;
+        }
+
+        /* ═══ CARD ═══ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header-left h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+
+        .node-badge {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .badge-client {
+            background: var(--accent-dim);
+            color: var(--accent-light);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .badge-server {
+            background: var(--success-dim);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .card-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 400;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        /* ═══ TIMER BAR ═══ */
+        .timer-section {
+            margin-bottom: 20px;
+        }
+
+        .timer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .timer-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .timer-label .dot {
+            width: 5px;
+            height: 5px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        .timer-countdown {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-bright);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+
+        /* ═══ CIRCULAR BUFFER RING ═══ */
+        .ring-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0 20px;
+            position: relative;
+        }
+
+        .ring-svg {
+            width: 260px;
+            height: 260px;
+            filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.06));
+        }
+
+        .ring-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -48%);
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .ring-count {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-bright);
+            line-height: 1;
+            letter-spacing: -1px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ring-sublabel {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .ring-state {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 12px;
+            border-radius: 12px;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .state-empty {
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-light);
+        }
+
+        .state-active {
+            background: var(--accent-dim);
+            color: var(--accent-light);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .state-full {
+            background: var(--danger-dim);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .legend-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        /* ═══ METRICS ═══ */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+
+        .metric-card:hover {
+            border-color: var(--border-light);
+        }
+
+        .metric-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-bright);
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-value.val-accent {
+            color: var(--accent-light);
+        }
+
+        .metric-value.val-success {
+            color: var(--success);
+        }
+
+        .metric-value.val-warning {
+            color: var(--warning);
+        }
+
+        .metric-value.val-danger {
+            color: var(--danger);
+        }
+
+        .metric-value.val-cyan {
+            color: var(--cyan);
+        }
+
+        /* ═══ BUTTONS ═══ */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-xs);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            letter-spacing: 0.1px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: var(--text-bright);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #5558e6;
+            border-color: #5558e6;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 11px;
+        }
+
+        .btn-speed {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 5px 10px;
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+        }
+
+        /* ═══ TERMINAL ═══ */
+        .terminal-wrapper {
+            background: var(--bg-terminal);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 380px;
+            margin-top: 14px;
+        }
+
+        .terminal-titlebar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .terminal-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-left: 6px;
+        }
+
+        .terminal-output {
+            flex: 1;
+            padding: 14px 16px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.65;
+            color: #9ca3af;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .terminal-output::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .terminal-input-row {
+            display: flex;
+            align-items: center;
+            border-top: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .terminal-prompt {
+            padding: 10px 4px 10px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-light);
+            user-select: none;
+        }
+
+        .terminal-input-row input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-bright);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 10px 14px 10px 6px;
+            caret-color: var(--accent-light);
+        }
+
+        .terminal-input-row input::placeholder {
+            color: var(--text-dim);
+        }
+
+        /* ═══ TABLE ═══ */
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.015);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 10px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .slot-chip {
+            display: inline-flex;
+            align-items: center;
+            background: var(--accent-dim);
+            color: var(--accent-light);
+            font-weight: 600;
+            font-size: 11px;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--success-dim);
+            color: var(--success);
+            font-weight: 600;
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(16, 185, 129, 0.15);
+        }
+
+        .record-counter {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 32px 20px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .empty-state strong {
+            color: var(--accent-light);
+        }
+
+        /* ═══ DIVIDER ═══ */
+        .section-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-container {
+                padding: 16px;
+            }
+        }
+
+        /* ═══ SCROLLBAR GLOBAL ═══ */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* ═══ ANIMATIONS ═══ */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            animation: fadeIn 0.4s ease-out both;
+        }
+
+        .card:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .card:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-left">
+            <div class="header-title">
+                <h1>Dual Firmware <span>(ESP32)</span> — Circular Buffer Simulation</h1>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="connection-badge">
+                <div class="pulse-dot"></div>
+                ESP-NOW 2.4 GHz Link Active
+            </div>
+        </div>
+    </header>
+
+    <div class="page-container">
+
+        <!-- Alert Banner -->
+        <div id="alarmBanner" class="alert-banner">
+            <div class="alert-left">
+                <div class="alert-icon-box">⚠</div>
+                <div class="alert-text">
+                    <h3>Exception 0xEF — Circular Buffer Full</h3>
+                    <p>All 16 slots saturated. Periodic writes are blocked. Issue READ to free a slot.</p>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="executeCommand('READ')">Read & Free Slot</button>
+        </div>
+
+        <!-- Main Two-Column Layout -->
+        <div class="main-grid">
+
+            <!-- ═══ CLIENT CARD ═══ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <span class="node-badge badge-client">Client</span>
+                        <h2>ESP32 Node 1 — Buffer Host</h2>
+                    </div>
+                    <div class="card-header-right">
+                        <button class="btn btn-speed" id="btnSpeed" onclick="toggleSpeed()">0.1 Hz (10s)</button>
+                        <button class="btn btn-primary btn-sm" onclick="forceWriteTick()">Force Write</button>
+                    </div>
+                </div>
+                <div class="card-content">
+
+                    <!-- Timer -->
+                    <div class="timer-section">
+                        <div class="timer-row">
+                            <div class="timer-label">
+                                <span class="dot"></span>
+                                Periodic Hardware Timer
+                            </div>
+                            <span id="timerCountdown" class="timer-countdown">10.0s</span>
+                        </div>
+                        <div class="progress-track">
+                            <div id="progressBar" class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ring Visualization -->
+                    <div class="ring-container">
+                        <svg id="bufferSvg" class="ring-svg" viewBox="0 0 260 260"></svg>
+                        <div class="ring-center">
+                            <div id="occupancyVal" class="ring-count">0/16</div>
+                            <div class="ring-sublabel">Occupancy</div>
+                            <div id="bufferStateBadge" class="ring-state state-empty">Empty</div>
+                        </div>
+                    </div>
+
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-swatch" style="background:#2a3246;border:1px solid #3a4560;"></div>Free
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-swatch" style="background:var(--accent);"></div>Stored
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-swatch" style="background:var(--success);"></div>Head (write)
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-swatch" style="background:var(--warning);"></div>Tail (read)
+                        </div>
+                    </div>
+
+                    <!-- Pointer Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Head</div>
+                            <div id="metricHead" class="metric-value val-success">#0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Tail</div>
+                            <div id="metricTail" class="metric-value val-warning">#0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Total Writes</div>
+                            <div id="metricWrites" class="metric-value">0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Total Reads</div>
+                            <div id="metricReads" class="metric-value">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry Metrics -->
+                    <div class="metrics-grid" style="margin-top:8px;">
+                        <div class="metric-card">
+                            <div class="metric-label">Free Heap</div>
+                            <div id="metricHeap" class="metric-value val-cyan">245,120 B</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Chip Temp</div>
+                            <div id="metricTemp" class="metric-value">38.4 °C</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Wi-Fi RSSI</div>
+                            <div id="metricRssi" class="metric-value val-accent">−48 dBm</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Exceptions</div>
+                            <div id="metricExceptions" class="metric-value val-danger">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ SERVER CARD ═══ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <span class="node-badge badge-server">Server</span>
+                        <h2>ESP32 Node 2 — PC UART Gateway</h2>
+                    </div>
+                    <span class="header-meta">115200 · 8N1</span>
+                </div>
+                <div class="card-content">
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="executeCommand('READ')">Read (R)</button>
+                        <button class="btn" onclick="executeCommand('PEEK')">Peek (P)</button>
+                        <button class="btn" onclick="executeCommand('STATUS')">Status (S)</button>
+                        <button class="btn" onclick="executeCommand('PAUSE_WR')">Pause Write</button>
+                        <button class="btn" onclick="executeCommand('RESUME_WR')">Resume Write</button>
+                        <button class="btn" onclick="executeCommand('RESTART_RD')">Restart Read</button>
+                        <button class="btn btn-danger" onclick="executeCommand('RESET_BUF')">Reset Buffer</button>
+                        <button class="btn" onclick="executeCommand('HELP')">Help (?)</button>
+                        <button class="btn btn-ghost" onclick="clearTerminal()">Clear</button>
+                    </div>
+
+                    <div class="terminal-wrapper">
+                        <div class="terminal-titlebar">
+                            <div class="terminal-dot" style="background:#ef4444;"></div>
+                            <div class="terminal-dot" style="background:#f59e0b;"></div>
+                            <div class="terminal-dot" style="background:#22c55e;"></div>
+                            <span class="terminal-title">UART Terminal — Server Console</span>
+                        </div>
+                        <div id="terminalOutput" class="terminal-output"></div>
+                        <div class="terminal-input-row">
+                            <span class="terminal-prompt">CMD›</span>
+                            <input type="text" id="terminalInput" placeholder="Type telecommand (READ, STATUS, HELP)..."
+                                autofocus>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TELEMETRY TABLE ═══ -->
+            <div class="card full-width">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <h2>📋 Downlinked Telemetry Log</h2>
+                    </div>
+                    <span class="record-counter" id="recordCountLabel">0 records</span>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Sequence</th>
+                                <th>Buffer Slot</th>
+                                <th>Uptime (ms)</th>
+                                <th>Free Heap</th>
+                                <th>Core Temp</th>
+                                <th>Wi-Fi RSSI</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="7" class="empty-state">No telemetry records downlinked yet. Click
+                                    <strong>Read</strong> or type <strong>R</strong> to extract oldest stored telemetry.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const CAPACITY = 16;
+        let storage = new Array(CAPACITY).fill(null);
+        let head = 0, tail = 0, count = 0;
+        let totalWrites = 0, totalReads = 0, fullExceptions = 0;
+        let writeEnabled = true, sequenceCounter = 0, clientUptimeMs = 0;
+        let periodMs = 10000, timerRemainingMs = 10000;
+        const TICK = 100;
+        let isFastMode = false;
+        let downlinkedRecords = [];
+
+        const $ = id => document.getElementById(id);
+        const termOut = $("terminalOutput");
+        const termIn = $("terminalInput");
+        const alarm = $("alarmBanner");
+        const svg = $("bufferSvg");
+
+        function log(t) { termOut.textContent += t + "\n"; termOut.scrollTop = termOut.scrollHeight; }
+        function clearTerminal() { termOut.textContent = ""; }
+
+        function printHelp() {
+            log(
+                `╔══════════════════════════════════════════════════════════════════╗
+║       Dual Firmware (ESP32) — Circular Buffer Simulation       ║
+╠══════════════════════════════════════════════════════════════════╣
+║  READ       (R)   Read oldest record · frees slot for rewrite  ║
+║  PEEK       (P)   Inspect oldest without advancing tail        ║
+║  STATUS     (S)   Buffer diagnostics: capacity & pointers      ║
+║  PAUSE_WR         Pause 0.1 Hz periodic telemetry writes       ║
+║  RESUME_WR        Resume periodic writing                      ║
+║  RESTART_RD       Restart / resume read session                ║
+║  RESET_BUF        Clear & reinitialize buffer memory           ║
+║  HELP       (?)   Show this command reference                  ║
+╚══════════════════════════════════════════════════════════════════╝`);
+        }
+
+        function renderRing() {
+            svg.innerHTML = "";
+            const cx = 130, cy = 130, r = 95, sr = 14;
+
+            /* Background ring guide */
+            const guide = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            guide.setAttribute("cx", cx); guide.setAttribute("cy", cy); guide.setAttribute("r", r);
+            guide.setAttribute("fill", "none");
+            guide.setAttribute("stroke", "rgba(255,255,255,0.03)");
+            guide.setAttribute("stroke-width", "1");
+            svg.appendChild(guide);
+
+            for (let i = 0; i < CAPACITY; i++) {
+                const a = (i * 2 * Math.PI / CAPACITY) - Math.PI / 2;
+                const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+
+                /* Glow effect for filled slots */
+                if (storage[i] !== null) {
+                    const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    glow.setAttribute("cx", x); glow.setAttribute("cy", y); glow.setAttribute("r", sr + 4);
+                    glow.setAttribute("fill", "rgba(99,102,241,0.08)");
+                    glow.setAttribute("stroke", "none");
+                    svg.appendChild(glow);
+                }
+
+                const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", sr);
+
+                let fill = "#1e2740", stroke = "#2a3a54", sw = "1.5";
+                if (storage[i] !== null) { fill = "#4f46e5"; stroke = "#6366f1"; sw = "2"; }
+                if (i === head && i === tail && count > 0) { fill = "#dc2626"; stroke = "#ef4444"; sw = "2.5"; }
+                else if (i === head && count < CAPACITY) { fill = storage[i] ? "#4f46e5" : "#1e2740"; stroke = "#10b981"; sw = "2.5"; }
+                else if (i === tail && count > 0) { stroke = "#f59e0b"; sw = "2.5"; }
+
+                c.setAttribute("fill", fill);
+                c.setAttribute("stroke", stroke);
+                c.setAttribute("stroke-width", sw);
+                svg.appendChild(c);
+
+                const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                t.setAttribute("x", x); t.setAttribute("y", y + 4);
+                t.setAttribute("text-anchor", "middle");
+                t.setAttribute("fill", storage[i] ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.25)");
+                t.setAttribute("font-size", "10");
+                t.setAttribute("font-weight", "600");
+                t.setAttribute("font-family", "Inter, sans-serif");
+                t.textContent = i;
+                svg.appendChild(t);
+            }
+
+            $("occupancyVal").textContent = `${count}/${CAPACITY}`;
+            $("metricHead").textContent = `#${head}`;
+            $("metricTail").textContent = `#${tail}`;
+            $("metricWrites").textContent = totalWrites;
+            $("metricReads").textContent = totalReads;
+            $("metricExceptions").textContent = fullExceptions;
+
+            const badge = $("bufferStateBadge");
+            if (count >= CAPACITY) {
+                badge.textContent = "FULL"; badge.className = "ring-state state-full";
+                alarm.classList.add("visible");
+            } else if (count === 0) {
+                badge.textContent = "Empty"; badge.className = "ring-state state-empty";
+                alarm.classList.remove("visible");
+            } else {
+                badge.textContent = "Active"; badge.className = "ring-state state-active";
+                alarm.classList.remove("visible");
+            }
+        }
+
+        function sampleTelemetry() {
+            clientUptimeMs += periodMs;
+            sequenceCounter++;
+            const rec = {
+                sequenceId: sequenceCounter, slotId: head, timestampMs: clientUptimeMs,
+                freeHeap: 245760 - (sequenceCounter * 64), minFreeHeap: 210000,
+                chipTemp: (38.2 + (sequenceCounter % 5) * 0.4).toFixed(1),
+                wifiRssi: -45 - (sequenceCounter % 7), cpuFreqMhz: 240
+            };
+            $("metricHeap").textContent = rec.freeHeap.toLocaleString() + " B";
+            $("metricTemp").textContent = rec.chipTemp + " °C";
+            $("metricRssi").textContent = rec.wifiRssi + " dBm";
+
+            if (!writeEnabled) return;
+            if (count >= CAPACITY) {
+                fullExceptions++;
+                $("metricExceptions").textContent = fullExceptions;
+                alarm.classList.add("visible");
+                log(`\n⚠  [EXCEPTION 0xEF] Buffer full — write blocked at slot #${head}. Total exceptions: ${fullExceptions}`);
+                return;
+            }
+            storage[head] = rec;
+            head = (head + 1) % CAPACITY;
+            count++; totalWrites++;
+            renderRing();
+        }
+
+        function forceWriteTick() { sampleTelemetry(); timerRemainingMs = periodMs; }
+
+        setInterval(() => {
+            timerRemainingMs -= TICK;
+            if (timerRemainingMs <= 0) { sampleTelemetry(); timerRemainingMs = periodMs; }
+            $("progressBar").style.width = ((periodMs - timerRemainingMs) / periodMs * 100) + "%";
+            $("timerCountdown").textContent = (timerRemainingMs / 1000).toFixed(1) + "s";
+        }, TICK);
+
+        function toggleSpeed() {
+            isFastMode = !isFastMode;
+            periodMs = isFastMode ? 2000 : 10000;
+            timerRemainingMs = periodMs;
+            $("btnSpeed").textContent = isFastMode ? "1 Hz (2s)" : "0.1 Hz (10s)";
+        }
+
+        function executeCommand(cmd) {
+            cmd = cmd.trim().toUpperCase();
+            log(`› ${cmd}`);
+
+            if (cmd === "READ" || cmd === "R") {
+                if (count === 0) { log("  Buffer is empty — no data to read."); return; }
+                const rec = storage[tail], slot = tail;
+                storage[tail] = null;
+                tail = (tail + 1) % CAPACITY; count--; totalReads++;
+                renderRing();
+                appendHistory(rec, slot);
+                log(`  ┌─ Telemetry Record #${rec.sequenceId} from slot #${slot}`);
+                log(`  │  Uptime: ${rec.timestampMs.toLocaleString()} ms  ·  Heap: ${rec.freeHeap.toLocaleString()} B`);
+                log(`  │  Temp: ${rec.chipTemp} °C  ·  RSSI: ${rec.wifiRssi} dBm  ·  CPU: ${rec.cpuFreqMhz} MHz`);
+                log(`  └─ Slot #${slot} freed for rewriting`);
+            }
+            else if (cmd === "PEEK" || cmd === "P") {
+                if (count === 0) { log("  Buffer is empty."); return; }
+                const rec = storage[tail];
+                log(`  Peek slot #${tail}: Seq #${rec.sequenceId} · ${rec.timestampMs.toLocaleString()} ms · ${rec.freeHeap.toLocaleString()} B (not freed)`);
+            }
+            else if (cmd === "STATUS" || cmd === "S") {
+                const pct = Math.round(count * 100 / CAPACITY);
+                const bar = "█".repeat(Math.round(count / CAPACITY * 16)) + "░".repeat(16 - Math.round(count / CAPACITY * 16));
+                log(`  ┌─ Buffer Status ────────────────────────────`);
+                log(`  │  Capacity : ${CAPACITY}  ·  Used : ${count} (${pct}%)  ·  Free : ${CAPACITY - count}`);
+                log(`  │  [${bar}]`);
+                log(`  │  Head : #${head}  ·  Tail : #${tail}`);
+                log(`  │  Writes : ${totalWrites}  ·  Reads : ${totalReads}  ·  Exceptions : ${fullExceptions}`);
+                log(`  └─ Write state : ${writeEnabled ? "enabled ✓" : "paused ⏸"}`);
+            }
+            else if (cmd === "PAUSE_WR") { writeEnabled = false; log("  ⏸ Periodic writing paused."); }
+            else if (cmd === "RESUME_WR") { writeEnabled = true; log(`  ▶ Writing resumed from slot #${head}.`); }
+            else if (cmd === "RESTART_RD") { log(`  ↻ Read session active from slot #${tail}.`); }
+            else if (cmd === "RESET_BUF") {
+                storage.fill(null); head = tail = count = fullExceptions = 0; writeEnabled = true;
+                totalWrites = 0; totalReads = 0; sequenceCounter = 0; clientUptimeMs = 0;
+                downlinkedRecords = [];
+                $("historyTableBody").innerHTML = '<tr><td colspan="7" class="empty-state">No telemetry records downlinked yet. Click <strong>Read</strong> or type <strong>R</strong> to extract oldest stored telemetry.</td></tr>';
+                $("recordCountLabel").textContent = "0 records";
+                renderRing(); log("  ✓ Buffer reset to initial state. All counters cleared.");
+            }
+            else if (cmd === "HELP" || cmd === "?") { printHelp(); }
+            else if (cmd === "QUIT" || cmd === "Q") { log("  (Simulator runs in-browser — close the tab to exit.)"); }
+            else { log(`  Unknown command: '${cmd}'. Type HELP for available commands.`); }
+        }
+
+        function appendHistory(rec, slot) {
+            downlinkedRecords.unshift(rec);
+            $("recordCountLabel").textContent = `${downlinkedRecords.length} record${downlinkedRecords.length !== 1 ? "s" : ""}`;
+            if (downlinkedRecords.length === 1) $("historyTableBody").innerHTML = "";
+            const tr = document.createElement("tr");
+            tr.style.animation = "fadeIn 0.3s ease-out";
+            tr.innerHTML = `
+        <td style="font-weight:600;color:var(--text-bright);">#${rec.sequenceId}</td>
+        <td><span class="slot-chip">#${slot}</span></td>
+        <td>${rec.timestampMs.toLocaleString()}</td>
+        <td>${rec.freeHeap.toLocaleString()} B</td>
+        <td>${rec.chipTemp} °C</td>
+        <td>${rec.wifiRssi} dBm</td>
+        <td><span class="status-chip">✓ Freed</span></td>`;
+            $("historyTableBody").insertBefore(tr, $("historyTableBody").firstChild);
+        }
+
+        termIn.addEventListener("keydown", e => {
+            if (e.key === "Enter" && termIn.value.trim()) { executeCommand(termIn.value); termIn.value = ""; }
+        });
+
+        printHelp();
+        renderRing();
+    </script>
+</body>
+
+</html>

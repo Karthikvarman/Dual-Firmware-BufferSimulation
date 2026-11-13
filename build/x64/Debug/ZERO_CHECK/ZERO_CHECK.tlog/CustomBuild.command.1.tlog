@@ -1,0 +1,10 @@
+^C:\USERS\ATKVA\ONEDRIVE\DESKTOP\INSPECITY - 1B\BUILD\CMAKEFILES\8217CA3C0405A68CB08015D76E2FB0A2\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/atkva/OneDrive/Desktop/Inspecity - 1b" "-BC:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/atkva/OneDrive/Desktop/Inspecity - 1b/build/esp32_circular_buffer_system.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

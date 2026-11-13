@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/common",
+                "${workspaceFolder}/esp32_client/main",
+                "${workspaceFolder}/esp32_server/main",
+                "${workspaceFolder}/mock_esp_idf/include"
+            ],
+            "defines": [
+                "ESP_PLATFORM=1",
+                "IDF_VER=\"v5.1.0\"",
+                "CONFIG_IDF_TARGET_ESP32=1"
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}
