@@ -3,8 +3,7 @@
 **Document Reference:** ESP32-CB-SYS-2026-v1.0  
 **Target Hardware:** Espressif Systems ESP32-WROOM-32 / DevKit v1 ($\times$2)  
 **Standard Compliance:** MISRA-C:2012, IEEE 802.11 (ESP-NOW), ANSI/ISO C99/C11  
-**Author:** Principal Embedded Systems Engineer  
-**Date:** November 13, 2026  
+**Author:** Karthik Varman A T
 
 ---
 
