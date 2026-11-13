@@ -1,4 +1,4 @@
-# Dual Firmware — Circular Buffer System Architecture
+# Dual Firmware - Circular Buffer System Architecture
 
 ---
 
