@@ -146,9 +146,8 @@ static void client_worker_task(void *pvParameters) {
         size_t written_slot = 0U;
         cb_status_t status;
 
-        capture_system_telemetry(&record, 0U);
-
         xSemaphoreTake(s_buf_mutex, portMAX_DELAY);
+        capture_system_telemetry(&record, (uint16_t)s_circ_buf.head);
         status = cb_write(&s_circ_buf, &record, &written_slot);
         if (status == CB_OK) {
           

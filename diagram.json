@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "author": "Dual ESP32 Simulation with Circular Ring OLED Display",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp32_server",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp32_client",
+      "top": 0,
+      "left": 350,
+      "attrs": {}
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled_ring",
+      "top": 240,
+      "left": 170,
+      "attrs": {
+        "i2cAddress": "0x3c"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_head",
+      "top": 270,
+      "left": 340,
+      "attrs": {
+        "color": "green",
+        "label": "HEAD"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_tail",
+      "top": 270,
+      "left": 400,
+      "attrs": {
+        "color": "cyan",
+        "label": "TAIL"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_full",
+      "top": 270,
+      "left": 460,
+      "attrs": {
+        "color": "red",
+        "label": "FULL"
+      }
+    }
+  ],
+  "serialMonitor": {
+    "display": "always",
+    "newline": "lf"
+  },
+  "connections": [
+    ["esp32_server:17", "esp32_client:16", "green", []],
+    ["esp32_client:17", "esp32_server:16", "blue", []],
+    ["esp32_server:GND.1", "esp32_client:GND.1", "black", []],
+
+    ["esp32_server:21", "oled_ring:SDA", "green", []],
+    ["esp32_server:22", "oled_ring:SCL", "blue", []],
+    ["esp32_server:3V3", "oled_ring:VCC", "red", []],
+    ["esp32_server:GND.2", "oled_ring:GND", "black", []],
+
+    ["esp32_server:25", "led_head:A", "green", []],
+    ["esp32_server:GND.3", "led_head:C", "black", []],
+    ["esp32_server:26", "led_tail:A", "cyan", []],
+    ["esp32_server:GND.4", "led_tail:C", "black", []],
+    ["esp32_server:27", "led_full:A", "red", []],
+    ["esp32_server:GND.5", "led_full:C", "black", []]
+  ]
+}

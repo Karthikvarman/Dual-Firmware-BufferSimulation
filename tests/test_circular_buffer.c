@@ -18,7 +18,7 @@ static void populate_dummy_telemetry(telemetry_record_t *rec, uint32_t seq)
     rec->min_free_heap_bytes = 210000U;
     rec->chip_temp_c         = (int8_t)(38 + (seq % 5U));
     rec->wifi_rssi_dbm       = (int8_t)(-45 - (seq % 10U));
-    rec->buffer_slot_id      = 0U;
+    rec->buffer_slot_id      = (uint16_t)s_test_cb.head;
     rec->cpu_freq_mhz        = 240U;
 }
 
@@ -106,6 +106,7 @@ int main(void)
         status = cb_read(&s_test_cb, &out_rec, &slot);
         assert(status == CB_OK);
         assert(out_rec.sequence_id == expected_seqs[i]);
+        assert(out_rec.buffer_slot_id == slot);
         printf("  Resumed Read [%d/8]: Extracted Seq #%03u from Slot #%02u (Tail: %u)\n",
                i + 1, (unsigned int)out_rec.sequence_id, (unsigned int)slot, (unsigned int)s_test_cb.tail);
     }

@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual ESP32 Firmware Simulator - Circular Buffer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-main: #0a0e1a;
+            --bg-card: #111827;
+            --bg-card-inner: #151d2e;
+            --bg-elevated: #1a2236;
+            --bg-terminal: #0d1117;
+            --border: rgba(255, 255, 255, 0.06);
+            --border-light: rgba(255, 255, 255, 0.08);
+            --text-bright: #f0f4ff;
+            --text-primary: #c8d1e0;
+            --text-secondary: #7c8ba5;
+            --text-muted: #4a5568;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --accent-dim: rgba(99, 102, 241, 0.15);
+            --success: #10b981;
+            --success-dim: rgba(16, 185, 129, 0.12);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-dim: rgba(239, 68, 68, 0.1);
+            --cyan: #06b6d4;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            background: linear-gradient(180deg, #111827 0%, #0f1524 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+
+        .header-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .header-title h1 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-bright);
+        }
+
+        .header-title .subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .page-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px 24px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+        }
+
+        .card-header h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+
+        .esp-badge {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .badge-client {
+            background: var(--accent-dim);
+            color: var(--accent-light);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .badge-server {
+            background: var(--success-dim);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .card-content { padding: 20px; }
+
+        /* LED Matrix Display */
+        .led-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .led-matrix {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+            padding: 16px;
+            background: #000;
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+
+        .led {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            background: #1a1a1a;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .led.active {
+            box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+        }
+
+        .led.empty { background: #1a1a1a; }
+        .led.filled { background: var(--accent); color: var(--accent); }
+        .led.reading { background: var(--warning); color: var(--warning); }
+        .led.head { background: var(--success); color: var(--success); }
+        .led.tail { background: var(--cyan); color: var(--cyan); }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-bright);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #5558e6;
+        }
+
+        .btn-danger {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Terminal */
+        .terminal-wrapper {
+            background: var(--bg-terminal);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 300px;
+            margin-top: 14px;
+        }
+
+        .terminal-output {
+            flex: 1;
+            padding: 14px 16px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #9ca3af;
+            white-space: pre-wrap;
+        }
+
+        .terminal-output::-webkit-scrollbar { width: 6px; }
+        .terminal-output::-webkit-scrollbar-track { background: transparent; }
+        .terminal-output::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 3px; }
+
+        .log-line { margin-bottom: 4px; }
+        .log-timestamp { color: var(--text-muted); margin-right: 8px; }
+        .log-client { color: var(--accent-light); }
+        .log-server { color: var(--success); }
+        .log-error { color: var(--danger); }
+        .log-warning { color: var(--warning); }
+        .log-info { color: var(--cyan); }
+
+        /* Timer */
+        .timer-section {
+            margin-bottom: 16px;
+        }
+
+        .timer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .timer-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .timer-countdown {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-bright);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            display: none;
+            background: var(--danger-dim);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius);
+            padding: 14px 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .alert-banner.visible { display: flex; }
+
+        .alert-text h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fca5a5;
+        }
+
+        .alert-text p {
+            font-size: 12px;
+            color: #f87171;
+            margin-top: 2px;
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        /* Protocol visualizer */
+        .protocol-viz {
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .protocol-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .packet-flow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+        }
+
+        .packet-node {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+        }
+
+        .packet-arrow {
+            color: var(--text-muted);
+        }
+
+        .packet-arrow.active {
+            color: var(--accent);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <div class="header-logo">2x</div>
+            <div class="header-title">
+                <h1>Dual ESP32 Firmware Simulator</h1>
+                <div class="subtitle">Real-time Circular Buffer with LED Display</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="esp-badge badge-client">CLIENT</div>
+            <div class="esp-badge badge-server">SERVER</div>
+        </div>
+    </header>
+
+    <div class="page-container">
+        <!-- Alert Banner -->
+        <div class="alert-banner" id="alertBanner">
+            <div class="alert-text">
+                <h3>⚠️ BUFFER FULL EXCEPTION</h3>
+                <p id="alertMessage">Circular buffer is full. Send READ command to free slots.</p>
+            </div>
+            <button class="btn btn-danger" onclick="dismissAlert()">Dismiss</button>
+        </div>
+
+        <div class="main-grid">
+            <!-- Client ESP Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h2>ESP32 Client</h2>
+                        <span class="esp-badge badge-client">BUFFER NODE</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                        MAC: AA:BB:CC:DD:EE:01
+                    </div>
+                </div>
+                <div class="card-content">
+                    <!-- Timer -->
+                    <div class="timer-section">
+                        <div class="timer-row">
+                            <span class="timer-label">
+                                <span style="width: 5px; height: 5px; background: var(--accent); border-radius: 50%; display: inline-block;"></span>
+                                0.1 Hz Telemetry Timer
+                            </span>
+                            <span class="timer-countdown" id="timerCountdown">10.0s</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="timerProgress"></div>
+                        </div>
+                    </div>
+
+                    <!-- LED Matrix -->
+                    <div class="led-section">
+                        <div class="led-matrix" id="ledMatrix"></div>
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: #1a1a1a;"></div>
+                                <span>Empty</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: var(--accent);"></div>
+                                <span>Filled</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: var(--success);"></div>
+                                <span>Head (Write)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: var(--cyan);"></div>
+                                <span>Tail (Read)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Capacity</div>
+                            <div class="metric-value" id="capacity">16</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Used</div>
+                            <div class="metric-value val-accent" id="used">0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Writes</div>
+                            <div class="metric-value val-success" id="writes">0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Reads</div>
+                            <div class="metric-value val-cyan" id="reads">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Client Terminal -->
+                    <div class="terminal-wrapper">
+                        <div class="terminal-output" id="clientTerminal"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server ESP Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h2>ESP32 Server</h2>
+                        <span class="esp-badge badge-server">GATEWAY</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                        MAC: AA:BB:CC:DD:EE:02
+                    </div>
+                </div>
+                <div class="card-content">
+                    <!-- Protocol Visualizer -->
+                    <div class="protocol-viz">
+                        <div class="protocol-title">Wireless Communication (ESP-NOW)</div>
+                        <div class="packet-flow">
+                            <div class="packet-node">SERVER</div>
+                            <div class="packet-arrow" id="arrowServerToClient">→</div>
+                            <div class="packet-node">CLIENT</div>
+                            <div class="packet-arrow" id="arrowClientToServer">←</div>
+                            <div class="packet-node">SERVER</div>
+                        </div>
+                    </div>
+
+                    <!-- Commands -->
+                    <div style="margin-top: 16px;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.8px;">
+                            Telecommands
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="sendCommand('READ')">READ (R)</button>
+                            <button class="btn" onclick="sendCommand('PEEK')">PEEK (P)</button>
+                            <button class="btn" onclick="sendCommand('STATUS')">STATUS (S)</button>
+                            <button class="btn" onclick="sendCommand('PAUSE_WR')">PAUSE WR</button>
+                            <button class="btn" onclick="sendCommand('RESUME_WR')">RESUME WR</button>
+                            <button class="btn" onclick="sendCommand('RESTART_RD')">RESTART RD</button>
+                            <button class="btn btn-danger" onclick="sendCommand('RESET_BUF')">RESET BUF</button>
+                        </div>
+                    </div>
+
+                    <!-- Last Response -->
+                    <div style="margin-top: 16px; background: var(--bg-card-inner); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.8px;">
+                            Last Response
+                        </div>
+                        <div id="lastResponse" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary);">
+                            No response yet
+                        </div>
+                    </div>
+
+                    <!-- Server Terminal -->
+                    <div class="terminal-wrapper">
+                        <div class="terminal-output" id="serverTerminal"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ═══ CIRCULAR BUFFER IMPLEMENTATION ═══
+        const BUFFER_CAPACITY = 16;
+        const ITEM_SIZE = 28; // telemetry_record_t size
+
+        class CircularBuffer {
+            constructor(capacity, itemSize) {
+                this.capacity = capacity;
+                this.itemSize = itemSize;
+                this.storage = new Array(capacity).fill(null);
+                this.head = 0;
+                this.tail = 0;
+                this.count = 0;
+                this.totalWrites = 0;
+                this.totalReads = 0;
+                this.fullExceptions = 0;
+                this.writeEnabled = true;
+                this.isInitialized = true;
+            }
+
+            write(item) {
+                if (!this.writeEnabled) {
+                    return { status: 'WRITE_DISABLED', slot: null };
+                }
+                if (this.count >= this.capacity) {
+                    this.fullExceptions++;
+                    return { status: 'FULL', slot: null };
+                }
+
+                const slot = this.head;
+                this.storage[slot] = { ...item, slotId: slot };
+                this.head = (this.head + 1) % this.capacity;
+                this.count++;
+                this.totalWrites++;
+
+                return { status: 'OK', slot };
+            }
+
+            read() {
+                if (this.count === 0) {
+                    return { status: 'EMPTY', item: null, slot: null };
+                }
+
+                const slot = this.tail;
+                const item = this.storage[slot];
+                this.storage[slot] = null;
+                this.tail = (this.tail + 1) % this.capacity;
+                this.count--;
+                this.totalReads++;
+
+                return { status: 'OK', item, slot };
+            }
+
+            peek() {
+                if (this.count === 0) {
+                    return { status: 'EMPTY', item: null, slot: null };
+                }
+
+                const slot = this.tail;
+                const item = this.storage[slot];
+
+                return { status: 'OK', item, slot };
+            }
+
+            pauseWrite() {
+                this.writeEnabled = false;
+                return 'OK';
+            }
+
+            resumeWrite() {
+                this.writeEnabled = true;
+                return 'OK';
+            }
+
+            restartRead() {
+                // In real firmware, this would reset read position
+                return 'OK';
+            }
+
+            reset() {
+                this.storage = new Array(this.capacity).fill(null);
+                this.head = 0;
+                this.tail = 0;
+                this.count = 0;
+                this.totalWrites = 0;
+                this.totalReads = 0;
+                this.fullExceptions = 0;
+                this.writeEnabled = true;
+                return 'OK';
+            }
+
+            getDiagnostics() {
+                return {
+                    capacity: this.capacity,
+                    count: this.count,
+                    writeIndex: this.head,
+                    readIndex: this.tail,
+                    totalWrites: this.totalWrites,
+                    totalReads: this.totalReads,
+                    fullExceptions: this.fullExceptions,
+                    isFull: this.count >= this.capacity,
+                    isEmpty: this.count === 0,
+                    writeEnabled: this.writeEnabled
+                };
+            }
+        }
+
+        // ═══ PROTOCOL IMPLEMENTATION ═══
+        const PROTOCOL_SYNC_BYTE_1 = 0xAA;
+        const PROTOCOL_SYNC_BYTE_2 = 0x55;
+
+        const OPCODES = {
+            MSG_ACK: 0x01,
+            MSG_NACK: 0x02,
+            CMD_READ_REQ: 0x10,
+            CMD_PEEK_REQ: 0x12,
+            CMD_STATUS_REQ: 0x20,
+            CMD_PAUSE_WR_REQ: 0x30,
+            CMD_RESUME_WR_REQ: 0x31,
+            CMD_RESTART_RD_REQ: 0x32,
+            CMD_RESET_BUF_REQ: 0x33,
+            RESP_READ_DATA: 0x11,
+            RESP_PEEK_DATA: 0x13,
+            RESP_BUFFER_EMPTY: 0x14,
+            RESP_STATUS_DATA: 0x21,
+            ALERT_BUFFER_FULL: 0xEF
+        };
+
+        function computeCRC16(data) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= (data[i] << 8);
+                for (let j = 0; j < 8; j++) {
+                    if (crc & 0x8000) {
+                        crc = (crc << 1) ^ 0x1021;
+                    } else {
+                        crc = crc << 1;
+                    }
+                }
+            }
+            return crc & 0xFFFF;
+        }
+
+        function packFrame(seq, opcode, payload = []) {
+            const header = [PROTOCOL_SYNC_BYTE_1, PROTOCOL_SYNC_BYTE_2];
+            const seqBytes = [(seq >> 8) & 0xFF, seq & 0xFF];
+            const payloadLen = payload.length;
+            const frame = [...header, ...seqBytes, opcode, payloadLen, ...payload];
+            const crc = computeCRC16(frame);
+            const crcBytes = [(crc >> 8) & 0xFF, crc & 0xFF];
+            return [...frame, ...crcBytes];
+        }
+
+        // ═══ SIMULATOR STATE ═══
+        const buffer = new CircularBuffer(BUFFER_CAPACITY, ITEM_SIZE);
+        let sequenceNumber = 0;
+        let telemetrySequence = 0;
+        let timerInterval = null;
+        let timerProgress = 0;
+        const TIMER_PERIOD_MS = 10000; // 10 seconds for 0.1 Hz
+
+        // ═══ TELEMETRY GENERATION ═══
+        function generateTelemetry() {
+            telemetrySequence++;
+            return {
+                timestamp_ms: Date.now(),
+                sequence_id: telemetrySequence,
+                free_heap_bytes: Math.floor(200000 + Math.random() * 100000),
+                min_free_heap_bytes: 180000,
+                chip_temp_c: Math.floor(35 + Math.random() * 10),
+                wifi_rssi_dbm: Math.floor(-60 + Math.random() * 20),
+                buffer_slot_id: 0,
+                cpu_freq_mhz: 240
+            };
+        }
+
+        // ═══ UI UPDATES ═══
+        function updateLEDMatrix() {
+            const matrix = document.getElementById('ledMatrix');
+            matrix.innerHTML = '';
+
+            for (let i = 0; i < BUFFER_CAPACITY; i++) {
+                const led = document.createElement('div');
+                led.className = 'led';
+
+                if (i === buffer.head && buffer.count < buffer.capacity) {
+                    led.classList.add('head', 'active');
+                } else if (i === buffer.tail && buffer.count > 0) {
+                    led.classList.add('tail', 'active');
+                } else if (buffer.storage[i] !== null) {
+                    led.classList.add('filled', 'active');
+                } else {
+                    led.classList.add('empty');
+                }
+
+                matrix.appendChild(led);
+            }
+        }
+
+        function updateMetrics() {
+            document.getElementById('capacity').textContent = buffer.capacity;
+            document.getElementById('used').textContent = buffer.count;
+            document.getElementById('writes').textContent = buffer.totalWrites;
+            document.getElementById('reads').textContent = buffer.totalReads;
+        }
+
+        function addLog(terminalId, message, type = 'info') {
+            const terminal = document.getElementById(terminalId);
+            const line = document.createElement('div');
+            line.className = 'log-line';
+
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'log-timestamp';
+            timestampSpan.textContent = `[${timestamp}]`;
+
+            const messageSpan = document.createElement('span');
+            messageSpan.className = `log-${type}`;
+            messageSpan.textContent = message;
+
+            line.appendChild(timestampSpan);
+            line.appendChild(messageSpan);
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function showAlert(message) {
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('alertBanner').classList.add('visible');
+        }
+
+        function dismissAlert() {
+            document.getElementById('alertBanner').classList.remove('visible');
+        }
+
+        // ═══ TIMER SIMULATION ═══
+        function startTimer() {
+            const startTime = Date.now();
+
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                timerProgress = (elapsed % TIMER_PERIOD_MS) / TIMER_PERIOD_MS;
+                const remaining = Math.ceil((TIMER_PERIOD_MS - (elapsed % TIMER_PERIOD_MS)) / 1000);
+
+                document.getElementById('timerCountdown').textContent = `${remaining.toFixed(1)}s`;
+                document.getElementById('timerProgress').style.width = `${timerProgress * 100}%`;
+
+                if (elapsed % TIMER_PERIOD_MS < 100) {
+                    // Timer tick - write telemetry
+                    performPeriodicWrite();
+                }
+            }, 100);
+        }
+
+        function performPeriodicWrite() {
+            const telemetry = generateTelemetry();
+            const result = buffer.write(telemetry);
+
+            if (result.status === 'OK') {
+                addLog('clientTerminal', `[0.1 Hz WRITE] Slot #${result.slot}: Seq=${telemetry.sequence_id}, Uptime=${telemetry.timestamp_ms}ms, FreeHeap=${telemetry.free_heap_bytes} bytes`, 'client');
+                updateLEDMatrix();
+                updateMetrics();
+            } else if (result.status === 'FULL') {
+                addLog('clientTerminal', `[ERROR] Buffer FULL exception at slot ${buffer.head}. Total exceptions: ${buffer.fullExceptions}`, 'error');
+                showAlert(`Buffer FULL! Blocked write at slot ${buffer.head}. Total exceptions: ${buffer.fullExceptions}. Send READ to free slots.`);
+            } else if (result.status === 'WRITE_DISABLED') {
+                addLog('clientTerminal', `[WARN] Writing is PAUSED by telecommand`, 'warning');
+            }
+        }
+
+        // ═══ COMMAND HANDLING ═══
+        function sendCommand(command) {
+            const cmdMap = {
+                'READ': OPCODES.CMD_READ_REQ,
+                'PEEK': OPCODES.CMD_PEEK_REQ,
+                'STATUS': OPCODES.CMD_STATUS_REQ,
+                'PAUSE_WR': OPCODES.CMD_PAUSE_WR_REQ,
+                'RESUME_WR': OPCODES.CMD_RESUME_WR_REQ,
+                'RESTART_RD': OPCODES.CMD_RESTART_RD_REQ,
+                'RESET_BUF': OPCODES.CMD_RESET_BUF_REQ
+            };
+
+            const opcode = cmdMap[command];
+            if (!opcode) return;
+
+            sequenceNumber++;
+            const frame = packFrame(sequenceNumber, opcode);
+
+            // Visualize packet flow
+            animatePacketFlow('server');
+
+            addLog('serverTerminal', `[TX] Sending ${command} command (opcode: 0x${opcode.toString(16).padStart(2, '0')})`, 'server');
+
+            // Process command on client
+            setTimeout(() => {
+                processClientCommand(opcode, command);
+            }, 200);
+        }
+
+        function processClientCommand(opcode, commandName) {
+            animatePacketFlow('client');
+
+            let responseOpcode;
+            let responsePayload = [];
+            let logMessage;
+
+            switch (opcode) {
+                case OPCODES.CMD_READ_REQ: {
+                    const result = buffer.read();
+                    if (result.status === 'OK') {
+                        responseOpcode = OPCODES.RESP_READ_DATA;
+                        responsePayload = [result.item];
+                        logMessage = `[RX] READ SUCCESS: Slot #${result.slot}, Seq=${result.item.sequence_id}`;
+                        addLog('clientTerminal', `[TELECOMMAND READ] Extracted oldest slot #${result.slot} (Seq=${result.item.sequence_id}). Slot freed.`, 'client');
+                    } else {
+                        responseOpcode = OPCODES.RESP_BUFFER_EMPTY;
+                        logMessage = `[RX] READ FAILED: Buffer is EMPTY`;
+                        addLog('clientTerminal', `[TELECOMMAND READ] Buffer is EMPTY`, 'warning');
+                    }
+                    break;
+                }
+
+                case OPCODES.CMD_PEEK_REQ: {
+                    const result = buffer.peek();
+                    if (result.status === 'OK') {
+                        responseOpcode = OPCODES.RESP_PEEK_DATA;
+                        responsePayload = [result.item];
+                        logMessage = `[RX] PEEK SUCCESS: Slot #${result.slot}, Seq=${result.item.sequence_id}`;
+                        addLog('clientTerminal', `[TELECOMMAND PEEK] Inspected slot #${result.slot} (Seq=${result.item.sequence_id}) without freeing`, 'client');
+                    } else {
+                        responseOpcode = OPCODES.RESP_BUFFER_EMPTY;
+                        logMessage = `[RX] PEEK FAILED: Buffer is EMPTY`;
+                        addLog('clientTerminal', `[TELECOMMAND PEEK] Buffer is EMPTY`, 'warning');
+                    }
+                    break;
+                }
+
+                case OPCODES.CMD_STATUS_REQ: {
+                    const diag = buffer.getDiagnostics();
+                    responseOpcode = OPCODES.RESP_STATUS_DATA;
+                    responsePayload = [diag];
+                    logMessage = `[RX] STATUS: ${diag.count}/${diag.capacity} used, ${diag.totalWrites} writes, ${diag.fullExceptions} exceptions`;
+                    addLog('clientTerminal', `[TELECOMMAND STATUS] Diagnostics sent: ${diag.count}/${diag.capacity} slots used`, 'client');
+                    break;
+                }
+
+                case OPCODES.CMD_PAUSE_WR_REQ: {
+                    const result = buffer.pauseWrite();
+                    responseOpcode = result === 'OK' ? OPCODES.MSG_ACK : OPCODES.MSG_NACK;
+                    logMessage = `[RX] PAUSE_WRITE: ${result}`;
+                    addLog('clientTerminal', `[TELECOMMAND PAUSE WRITE] Executed. Periodic telemetry writing paused.`, 'client');
+                    break;
+                }
+
+                case OPCODES.CMD_RESUME_WR_REQ: {
+                    const result = buffer.resumeWrite();
+                    responseOpcode = result === 'OK' ? OPCODES.MSG_ACK : OPCODES.MSG_NACK;
+                    logMessage = `[RX] RESUME_WRITE: ${result}`;
+                    addLog('clientTerminal', `[TELECOMMAND RESUME WRITE] Executed. Periodic telemetry writing resumed.`, 'client');
+                    break;
+                }
+
+                case OPCODES.CMD_RESTART_RD_REQ: {
+                    const result = buffer.restartRead();
+                    responseOpcode = result === 'OK' ? OPCODES.MSG_ACK : OPCODES.MSG_NACK;
+                    logMessage = `[RX] RESTART_READ: ${result}`;
+                    addLog('clientTerminal', `[TELECOMMAND RESTART READ] Executed. Read session reset.`, 'client');
+                    break;
+                }
+
+                case OPCODES.CMD_RESET_BUF_REQ: {
+                    const result = buffer.reset();
+                    responseOpcode = result === 'OK' ? OPCODES.MSG_ACK : OPCODES.MSG_NACK;
+                    logMessage = `[RX] RESET_BUFFER: ${result}`;
+                    addLog('clientTerminal', `[TELECOMMAND RESET BUFFER] Executed. Circular buffer cleared and reinitialized.`, 'client');
+                    updateLEDMatrix();
+                    updateMetrics();
+                    dismissAlert();
+                    break;
+                }
+
+                default:
+                    responseOpcode = OPCODES.MSG_NACK;
+                    logMessage = `[RX] UNKNOWN OPCODE: 0x${opcode.toString(16)}`;
+            }
+
+            // Send response back to server
+            setTimeout(() => {
+                addLog('serverTerminal', logMessage, 'info');
+                displayServerResponse(responseOpcode, responsePayload);
+                updateLEDMatrix();
+                updateMetrics();
+            }, 200);
+        }
+
+        function displayServerResponse(opcode, payload) {
+            const responseDiv = document.getElementById('lastResponse');
+            let message = '';
+
+            switch (opcode) {
+                case OPCODES.RESP_READ_DATA:
+                    const readItem = payload[0];
+                    message = `READ SUCCESS:\n  Slot: #${readItem.slotId}\n  Seq: ${readItem.sequence_id}\n  Uptime: ${readItem.timestamp_ms}ms\n  Heap: ${readItem.free_heap_bytes} bytes\n  Temp: ${readItem.chip_temp_c}°C\n  RSSI: ${readItem.wifi_rssi_dbm} dBm`;
+                    break;
+                case OPCODES.RESP_PEEK_DATA:
+                    const peekItem = payload[0];
+                    message = `PEEK SUCCESS (unfreed):\n  Slot: #${peekItem.slotId}\n  Seq: ${peekItem.sequence_id}\n  Uptime: ${peekItem.timestamp_ms}ms\n  Heap: ${peekItem.free_heap_bytes} bytes`;
+                    break;
+                case OPCODES.RESP_BUFFER_EMPTY:
+                    message = 'BUFFER EMPTY - No data to read';
+                    break;
+                case OPCODES.RESP_STATUS_DATA:
+                    const diag = payload[0];
+                    const utilization = diag.capacity > 0 ? Math.round((diag.count / diag.capacity) * 100) : 0;
+                    message = `STATUS:\n  Capacity: ${diag.capacity}\n  Used: ${diag.count} (${utilization}%)\n  Free: ${diag.capacity - diag.count}\n  Head: Slot #${diag.writeIndex}\n  Tail: Slot #${diag.readIndex}\n  Writes: ${diag.totalWrites}\n  Reads: ${diag.totalReads}\n  Exceptions: ${diag.fullExceptions}\n  State: ${diag.isFull ? 'FULL' : (diag.isEmpty ? 'EMPTY' : 'ACTIVE')}\n  Write: ${diag.writeEnabled ? 'ENABLED' : 'PAUSED'}`;
+                    break;
+                case OPCODES.MSG_ACK:
+                    message = '✓ ACK - Command executed successfully';
+                    break;
+                case OPCODES.MSG_NACK:
+                    message = '✗ NACK - Command rejected';
+                    break;
+                default:
+                    message = `Unknown response: 0x${opcode.toString(16)}`;
+            }
+
+            responseDiv.textContent = message;
+        }
+
+        function animatePacketFlow(direction) {
+            const arrowServerToClient = document.getElementById('arrowServerToClient');
+            const arrowClientToServer = document.getElementById('arrowClientToServer');
+
+            if (direction === 'server') {
+                arrowServerToClient.classList.add('active');
+                setTimeout(() => arrowServerToClient.classList.remove('active'), 500);
+            } else {
+                arrowClientToServer.classList.add('active');
+                setTimeout(() => arrowClientToServer.classList.remove('active'), 500);
+            }
+        }
+
+        // ═══ INITIALIZATION ═══
+        function init() {
+            updateLEDMatrix();
+            updateMetrics();
+            startTimer();
+
+            addLog('clientTerminal', 'ESP32 Client initialized. Circular buffer ready (16 slots).', 'client');
+            addLog('clientTerminal', '0.1 Hz telemetry timer started (10s period).', 'client');
+            addLog('serverTerminal', 'ESP32 Server Gateway initialized. Ready to send telecommands.', 'server');
+        }
+
+        // Start the simulator
+        init();
+    </script>
+</body>
+</html>

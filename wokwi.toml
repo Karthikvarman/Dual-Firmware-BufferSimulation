@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "wokwi_sim/build/flasher_args.json"
+elf = "wokwi_sim/build/wokwi_dual_uart.elf"

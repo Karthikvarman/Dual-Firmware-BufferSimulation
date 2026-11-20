@@ -165,6 +165,15 @@ In the browser simulator (`web_simulator/index.html`), the exact same states, ti
 * **Synthetic Silicon Modeling:** Generates genuine ESP32 operational values (~245 KB heap, 38.2 °C–39.8 °C junction heat, -45 dBm to -51 dBm wireless attenuation).
 * **Authentic Algorithm:** The circular buffer logic, FIFO extraction, pointer handling, and `0xEF` overflow locking match the C implementation line-for-line.
 
+### Wokwi Dual-Node Simulation
+
+The `wokwi_sim` ESP-IDF project runs two ESP32 boards using one role-selectable
+firmware image. The client calls the shared `common/circular_buffer.c` code and
+captures telemetry every 10 seconds. UART1 connects the nodes and carries the
+existing CRC-framed commands and responses in place of the physical firmware's
+ESP-NOW transport. This validates the buffer and command flow in real time, but
+not ESP-NOW radio behavior.
+
 ---
 
 ## 5. Telecommand Interface Reference
