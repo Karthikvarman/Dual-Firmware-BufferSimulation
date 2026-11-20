@@ -24,6 +24,7 @@
 #define COMMAND_BUFFER_SIZE 64
 
 /* LED indicator GPIOs */
+#define BUILTIN_LED_GPIO GPIO_NUM_2
 #define LED_HEAD_GPIO GPIO_NUM_25
 #define LED_TAIL_GPIO GPIO_NUM_26
 #define LED_FULL_GPIO GPIO_NUM_27
@@ -305,14 +306,15 @@ static void update_led_indicators(void) {
 
 static void configure_leds(void) {
   const gpio_config_t led_cfg = {
-      .pin_bit_mask = (1ULL << LED_HEAD_GPIO) | (1ULL << LED_TAIL_GPIO) |
-                      (1ULL << LED_FULL_GPIO),
+      .pin_bit_mask = (1ULL << BUILTIN_LED_GPIO) | (1ULL << LED_HEAD_GPIO) |
+                      (1ULL << LED_TAIL_GPIO) | (1ULL << LED_FULL_GPIO),
       .mode = GPIO_MODE_OUTPUT,
       .pull_up_en = GPIO_PULLUP_DISABLE,
       .pull_down_en = GPIO_PULLDOWN_DISABLE,
       .intr_type = GPIO_INTR_DISABLE,
   };
   ESP_ERROR_CHECK(gpio_config(&led_cfg));
+  gpio_set_level(BUILTIN_LED_GPIO, 1);  // Turn on built-in LED
   gpio_set_level(LED_HEAD_GPIO, 0);
   gpio_set_level(LED_TAIL_GPIO, 0);
   gpio_set_level(LED_FULL_GPIO, 0);
