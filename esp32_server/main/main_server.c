@@ -12,6 +12,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -27,6 +28,8 @@
 #endif
 
 static const char *TAG = "SERVER_GATEWAY";
+
+#define BUILTIN_LED_GPIO GPIO_NUM_2
 
 #define PC_UART_NUM UART_NUM_0
 #define PC_UART_BAUD_RATE 115200
@@ -405,6 +408,18 @@ static void init_pc_uart_driver(void) {
                                       &s_uart_event_queue, 0));
 }
 
+static void init_gpio(void) {
+  gpio_config_t io_conf = {
+      .pin_bit_mask = (1ULL << BUILTIN_LED_GPIO),
+      .mode = GPIO_MODE_OUTPUT,
+      .pull_up_en = GPIO_PULLUP_DISABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE,
+  };
+  ESP_ERROR_CHECK(gpio_config(&io_conf));
+  gpio_set_level(BUILTIN_LED_GPIO, 1);
+}
+
 static void init_wifi_espnow(void) {
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -440,6 +455,7 @@ void app_main(void) {
 
   s_wireless_rx_queue = xQueueCreate(16, sizeof(wireless_packet_t));
 
+  init_gpio();
   init_pc_uart_driver();
 
   init_wifi_espnow();
